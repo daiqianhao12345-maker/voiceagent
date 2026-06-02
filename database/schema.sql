@@ -51,5 +51,10 @@ create table if not exists scraped_data (
     email text,
     website text,
     source_url text,
+    summary text,
+    status text default 'new',
     created_at timestamp default now()
 );
+
+alter table scraped_data add column if not exists summary text;
+alter table scraped_data add column if not exists status text default 'new';

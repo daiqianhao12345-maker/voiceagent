@@ -1,4 +1,4 @@
-import type { ActivityLog, Call, Customer, Meeting } from "@/types/crm";
+import type { ActivityLog, Call, Customer, Meeting, ScrapedData } from "@/types/crm";
 
 const now = new Date();
 const day = 24 * 60 * 60 * 1000;
@@ -122,3 +122,5 @@ export const demoActivity: ActivityLog[] = [
     created_at: new Date(now.getTime() - 1000 * 60 * 180).toISOString()
   }
 ];
+
+export const demoScrapedData: ScrapedData[] = [];

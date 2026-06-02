@@ -64,6 +64,21 @@ export default function SettingsPage() {
   "meeting_status": "booked",
   "meeting_notes": "Booked by n8n"
 }`
+        },
+        {
+          label: "Store Scraped Lead",
+          method: "POST" as const,
+          url: `${baseUrl}/api/scraped-data`,
+          description: "Store scraped company data in the CRM instead of appending rows to Google Sheets.",
+          payload: `{
+  "business_name": "Example Clinic",
+  "phone": "+14161234567",
+  "email": "info@example.com",
+  "website": "https://example.com",
+  "source_url": "https://search-result-or-directory-url",
+  "summary": "Short company summary",
+  "status": "new"
+}`
         }
       ]
     },
@@ -99,7 +114,14 @@ export default function SettingsPage() {
           label: "List Customers",
           method: "GET" as const,
           url: `${baseUrl}/api/customers`,
-          description: "Fetch all CRM customers."
+          description: "Fetch all CRM customers. Supports status, source, q, and limit query params.",
+          payload: `${baseUrl}/api/customers?status=new&limit=10`
+        },
+        {
+          label: "Get Customer Detail",
+          method: "GET" as const,
+          url: `${baseUrl}/api/customers/{customerId}`,
+          description: "Fetch one customer record by CRM UUID."
         },
         {
           label: "List Calls",
@@ -114,6 +136,13 @@ export default function SettingsPage() {
           description: "Fetch all stored meetings."
         },
         {
+          label: "List Scraped Leads",
+          method: "GET" as const,
+          url: `${baseUrl}/api/scraped-data`,
+          description: "Fetch scraped lead records stored in CRM. Supports status, q, and limit query params.",
+          payload: `${baseUrl}/api/scraped-data?status=new&limit=25`
+        },
+        {
           label: "Trigger Workflow",
           method: "POST" as const,
           url: `${baseUrl}/api/workflows/start`,
@@ -122,6 +151,42 @@ export default function SettingsPage() {
   "customerId": "customer uuid",
   "workflow": "voice-calling"
 }`
+        }
+      ]
+    },
+    {
+      title: "Replace Google Sheets nodes",
+      description: "Use these swaps in the n8n canvas shown in your screenshot.",
+      items: [
+        {
+          label: "Google Sheets Trigger: Customer Rows",
+          method: "GET" as const,
+          url: `${baseUrl}/api/customers?status=new&limit=1`,
+          description: "Replace sheet polling with CRM customer fetching. For event-based calling, use the CRM Start Call button instead."
+        },
+        {
+          label: "Google Sheets Append/Update: Customers",
+          method: "POST" as const,
+          url: `${baseUrl}/api/customers`,
+          description: "Replace customer row append/update with CRM customer creation. Use PUT /api/customers/{customerId} for updates."
+        },
+        {
+          label: "Google Sheets Update: Sentiment/Call Result",
+          method: "POST" as const,
+          url: `${baseUrl}/api/calls/webhook-result`,
+          description: "Replace sentiment sheet updates with call-result storage in CRM."
+        },
+        {
+          label: "Google Sheets Append: Scraped Companies",
+          method: "POST" as const,
+          url: `${baseUrl}/api/scraped-data`,
+          description: "Replace scraped company row append with CRM scraped-data storage."
+        },
+        {
+          label: "Google Sheets Update: Meeting Rows",
+          method: "POST" as const,
+          url: `${baseUrl}/api/meetings`,
+          description: "Replace meeting row append/update with CRM meeting records."
         }
       ]
     }

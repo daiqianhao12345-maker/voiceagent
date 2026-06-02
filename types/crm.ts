@@ -62,6 +62,18 @@ export type ActivityLog = {
   created_at: string;
 };
 
+export type ScrapedData = {
+  id: string;
+  business_name: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  source_url: string | null;
+  summary: string | null;
+  status: string | null;
+  created_at: string;
+};
+
 export type DashboardStats = {
   totalCustomers: number;
   totalCalls: number;

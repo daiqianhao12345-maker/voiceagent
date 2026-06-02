@@ -1,13 +1,14 @@
 import { randomUUID } from "crypto";
 import { hasDatabase, sql } from "@/lib/db";
-import { demoActivity, demoCalls, demoCustomers, demoMeetings } from "@/lib/mock-data";
-import type { ActivityLog, Call, Customer, CustomerStatus, DashboardStats, Meeting } from "@/types/crm";
+import { demoActivity, demoCalls, demoCustomers, demoMeetings, demoScrapedData } from "@/lib/mock-data";
+import type { ActivityLog, Call, Customer, CustomerStatus, DashboardStats, Meeting, ScrapedData } from "@/types/crm";
 
 type Store = {
   customers: Customer[];
   calls: Call[];
   meetings: Meeting[];
   activity: ActivityLog[];
+  scrapedData: ScrapedData[];
 };
 
 const globalStore = globalThis as typeof globalThis & { crmStore?: Store };
@@ -18,7 +19,8 @@ function store(): Store {
       customers: [...demoCustomers],
       calls: [...demoCalls],
       meetings: [...demoMeetings],
-      activity: [...demoActivity]
+      activity: [...demoActivity],
+      scrapedData: [...demoScrapedData]
     };
   }
   return globalStore.crmStore;
@@ -164,6 +166,19 @@ export async function createCall(input: Partial<Call>) {
   return call;
 }
 
+export async function getCall(id: string) {
+  if (hasDatabase && sql) {
+    const rows = (await sql`
+      select calls.*, customers.name as customer_name
+      from calls left join customers on customers.id = calls.customer_id
+      where calls.id = ${id}
+      limit 1
+    `) as Call[];
+    return rows[0] ?? null;
+  }
+  return store().calls.find((call) => call.id === id) ?? null;
+}
+
 export async function listMeetings(customerId?: string): Promise<Meeting[]> {
   if (hasDatabase && sql) {
     const rows = customerId
@@ -225,6 +240,88 @@ export async function createActivity(customerId: string | null, activityType: st
     description,
     created_at: new Date().toISOString()
   });
+}
+
+export async function listScrapedData(): Promise<ScrapedData[]> {
+  if (hasDatabase && sql) {
+    return (await sql`select * from scraped_data order by created_at desc`) as ScrapedData[];
+  }
+  return store().scrapedData.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
+}
+
+export async function getScrapedData(id: string) {
+  if (hasDatabase && sql) {
+    const rows = (await sql`select * from scraped_data where id = ${id} limit 1`) as ScrapedData[];
+    return rows[0] ?? null;
+  }
+  return store().scrapedData.find((item) => item.id === id) ?? null;
+}
+
+export async function createScrapedData(input: Partial<ScrapedData>) {
+  const payload = {
+    business_name: input.business_name || null,
+    phone: input.phone || null,
+    email: input.email || null,
+    website: input.website || null,
+    source_url: input.source_url || null,
+    summary: input.summary || null,
+    status: input.status || "new"
+  };
+
+  if (hasDatabase && sql) {
+    const rows = (await sql`
+      insert into scraped_data (business_name, phone, email, website, source_url, summary, status)
+      values (${payload.business_name}, ${payload.phone}, ${payload.email}, ${payload.website}, ${payload.source_url}, ${payload.summary}, ${payload.status})
+      returning *
+    `) as ScrapedData[];
+    await createActivity(null, "scraped_data_created", `${payload.business_name || "A scraped lead"} was stored.`);
+    return rows[0];
+  }
+
+  const item: ScrapedData = {
+    id: randomUUID(),
+    ...payload,
+    created_at: new Date().toISOString()
+  };
+  store().scrapedData.unshift(item);
+  await createActivity(null, "scraped_data_created", `${payload.business_name || "A scraped lead"} was stored.`);
+  return item;
+}
+
+export async function updateScrapedData(id: string, input: Partial<ScrapedData>) {
+  if (hasDatabase && sql) {
+    const rows = (await sql`
+      update scraped_data
+      set business_name = coalesce(${input.business_name}, business_name),
+          phone = ${input.phone ?? null},
+          email = ${input.email ?? null},
+          website = ${input.website ?? null},
+          source_url = ${input.source_url ?? null},
+          summary = ${input.summary ?? null},
+          status = coalesce(${input.status}, status)
+      where id = ${id}
+      returning *
+    `) as ScrapedData[];
+    if (rows[0]) await createActivity(null, "scraped_data_updated", `${rows[0].business_name || "A scraped lead"} was updated.`);
+    return rows[0] ?? null;
+  }
+
+  const data = store();
+  const index = data.scrapedData.findIndex((item) => item.id === id);
+  if (index === -1) return null;
+  data.scrapedData[index] = { ...data.scrapedData[index], ...input };
+  await createActivity(null, "scraped_data_updated", `${data.scrapedData[index].business_name || "A scraped lead"} was updated.`);
+  return data.scrapedData[index];
+}
+
+export async function deleteScrapedData(id: string) {
+  if (hasDatabase && sql) {
+    await sql`delete from scraped_data where id = ${id}`;
+    return true;
+  }
+  const data = store();
+  data.scrapedData = data.scrapedData.filter((item) => item.id !== id);
+  return true;
 }
 
 export async function listActivity(limit = 8): Promise<ActivityLog[]> {
