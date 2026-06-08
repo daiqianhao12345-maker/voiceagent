@@ -79,12 +79,12 @@ export async function updateCustomer(id: string, input: Partial<Customer>) {
     const rows = (await sql`
       update customers
       set name = coalesce(${input.name}, name),
-          email = ${input.email ?? null},
-          phone = ${input.phone ?? null},
-          company = ${input.company ?? null},
-          source = ${input.source ?? null},
+          email = coalesce(${input.email}, email),
+          phone = coalesce(${input.phone}, phone),
+          company = coalesce(${input.company}, company),
+          source = coalesce(${input.source}, source),
           status = coalesce(${input.status}, status),
-          notes = ${input.notes ?? null},
+          notes = coalesce(${input.notes}, notes),
           lead_score = coalesce(${input.lead_score}, lead_score),
           revenue = coalesce(${input.revenue}, revenue)
       where id = ${id}
@@ -293,11 +293,11 @@ export async function updateScrapedData(id: string, input: Partial<ScrapedData>)
     const rows = (await sql`
       update scraped_data
       set business_name = coalesce(${input.business_name}, business_name),
-          phone = ${input.phone ?? null},
-          email = ${input.email ?? null},
-          website = ${input.website ?? null},
-          source_url = ${input.source_url ?? null},
-          summary = ${input.summary ?? null},
+          phone = coalesce(${input.phone}, phone),
+          email = coalesce(${input.email}, email),
+          website = coalesce(${input.website}, website),
+          source_url = coalesce(${input.source_url}, source_url),
+          summary = coalesce(${input.summary}, summary),
           status = coalesce(${input.status}, status)
       where id = ${id}
       returning *
