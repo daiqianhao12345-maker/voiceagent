@@ -74,6 +74,26 @@ export async function createCustomer(input: Partial<Customer>) {
   return customer;
 }
 
+export async function upsertCustomerByEmail(input: Partial<Customer>) {
+  const email = input.email?.trim().toLowerCase();
+  if (!email) return createCustomer(input);
+
+  if (hasDatabase && sql) {
+    const existing = (await sql`select * from customers where lower(email) = ${email} limit 1`) as Customer[];
+    if (existing[0]) {
+      return updateCustomer(existing[0].id, input);
+    }
+    return createCustomer({ ...input, email });
+  }
+
+  const data = store();
+  const existing = data.customers.find((customer) => customer.email?.toLowerCase() === email);
+  if (existing) {
+    return updateCustomer(existing.id, input);
+  }
+  return createCustomer({ ...input, email });
+}
+
 export async function updateCustomer(id: string, input: Partial<Customer>) {
   if (hasDatabase && sql) {
     const rows = (await sql`
