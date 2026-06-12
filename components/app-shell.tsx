@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Headphones,
   LayoutDashboard,
+  SearchCheck,
   Settings,
   Users,
   Workflow
@@ -18,6 +19,7 @@ const nav = [
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/calls", label: "Calls", icon: Headphones },
   { href: "/meetings", label: "Meetings", icon: CalendarDays },
+  { href: "/research", label: "Research", icon: SearchCheck },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
 
