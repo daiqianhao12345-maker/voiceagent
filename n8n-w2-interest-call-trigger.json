@@ -1,0 +1,152 @@
+{
+  "name": "W2 - CRM Interest Calling",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crm-start-interest-call",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "w2-webhook",
+      "name": "CRM Start Call Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst rawPhone = String(body.phone || \"\").replace(/[^\\d+]/g, \"\");\nconst phone = rawPhone.startsWith(\"+\") ? rawPhone : `+1${rawPhone}`;\n\nreturn [{\n  json: {\n    customerId: body.customerId || body.customer_id || body.id,\n    name: body.name || \"Customer\",\n    email: body.email || \"\",\n    phone,\n    company: body.company || \"\",\n    title: body.title || \"\",\n    crmBaseUrl: body.crmBaseUrl || \"https://voiceagent-gamma-lovat.vercel.app\"\n  }\n}];"
+      },
+      "id": "w2-normalize",
+      "name": "Normalize CRM Customer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 240]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://voiceagent-gamma-lovat.vercel.app/api/customers/{{ $json.customerId }}",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "status", "value": "calling" },
+            { "name": "notes", "value": "W2 Vapi interest call started by n8n." }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w2-mark-calling",
+      "name": "Mark Customer Calling",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [480, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vapi.ai/call",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_VAPI_API_KEY" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"assistantId\": \"REPLACE_WITH_VAPI_ASSISTANT_ID\",\n  \"phoneNumberId\": \"REPLACE_WITH_VAPI_PHONE_NUMBER_ID\",\n  \"customer\": {\n    \"number\": \"{{ $('Normalize CRM Customer').item.json.phone }}\"\n  },\n  \"metadata\": {\n    \"customerId\": \"{{ $('Normalize CRM Customer').item.json.customerId }}\",\n    \"name\": \"{{ $('Normalize CRM Customer').item.json.name }}\",\n    \"email\": \"{{ $('Normalize CRM Customer').item.json.email }}\",\n    \"company\": \"{{ $('Normalize CRM Customer').item.json.company }}\",\n    \"title\": \"{{ $('Normalize CRM Customer').item.json.title }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "w2-start-vapi",
+      "name": "Start Vapi Interest Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [720, 240]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "minutes"
+      },
+      "id": "w2-wait",
+      "name": "Wait for Call Result",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [960, 240],
+      "webhookId": "w2-wait-for-vapi"
+    },
+    {
+      "parameters": {
+        "url": "https://api.vapi.ai/call/{{ $('Start Vapi Interest Call').item.json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_VAPI_API_KEY" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w2-get-vapi",
+      "name": "Get Vapi Call Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1200, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "REPLACE_WITH_W1_CONVERSATION_RECORDER_WEBHOOK_URL",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customerId", "value": "={{ $('Normalize CRM Customer').item.json.customerId }}" },
+            { "name": "name", "value": "={{ $('Normalize CRM Customer').item.json.name }}" },
+            { "name": "email", "value": "={{ $('Normalize CRM Customer').item.json.email }}" },
+            { "name": "phone", "value": "={{ $('Normalize CRM Customer').item.json.phone }}" },
+            { "name": "company", "value": "={{ $('Normalize CRM Customer').item.json.company }}" },
+            { "name": "title", "value": "={{ $('Normalize CRM Customer').item.json.title }}" },
+            { "name": "vapiCallId", "value": "={{ $('Start Vapi Interest Call').item.json.id }}" },
+            { "name": "call_status", "value": "={{ $json.status || 'completed' }}" },
+            { "name": "transcript", "value": "={{ $json.transcript || $json.transcriptText || '' }}" },
+            { "name": "summary", "value": "={{ $json.summary || '' }}" },
+            { "name": "duration", "value": "={{ $json.duration || $json.durationSeconds || 0 }}" },
+            { "name": "recording_url", "value": "={{ $json.recordingUrl || $json.recording_url || $json.stereoRecordingUrl || '' }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w2-send-w1",
+      "name": "Send Result to W1 Recorder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1440, 240]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": true,\n  \"workflow\": \"W2 Interest Calling\",\n  \"customerId\": \"{{ $('Normalize CRM Customer').item.json.customerId }}\",\n  \"vapiCallId\": \"{{ $('Start Vapi Interest Call').item.json.id }}\"\n}",
+        "options": {}
+      },
+      "id": "w2-response",
+      "name": "Respond to CRM",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1680, 240]
+    }
+  ],
+  "connections": {
+    "CRM Start Call Webhook": { "main": [[{ "node": "Normalize CRM Customer", "type": "main", "index": 0 }]] },
+    "Normalize CRM Customer": { "main": [[{ "node": "Mark Customer Calling", "type": "main", "index": 0 }]] },
+    "Mark Customer Calling": { "main": [[{ "node": "Start Vapi Interest Call", "type": "main", "index": 0 }]] },
+    "Start Vapi Interest Call": { "main": [[{ "node": "Wait for Call Result", "type": "main", "index": 0 }]] },
+    "Wait for Call Result": { "main": [[{ "node": "Get Vapi Call Result", "type": "main", "index": 0 }]] },
+    "Get Vapi Call Result": { "main": [[{ "node": "Send Result to W1 Recorder", "type": "main", "index": 0 }]] },
+    "Send Result to W1 Recorder": { "main": [[{ "node": "Respond to CRM", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}

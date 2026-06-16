@@ -1,0 +1,175 @@
+{
+  "name": "W1 - Conversation Recorder",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "w1-conversation-recorder",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "w1-webhook",
+      "name": "W1 Conversation Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst transcript = body.transcript || body.transcriptText || body.summary || \"\";\nreturn [{\n  json: {\n    customerId: body.customerId || body.customer_id || body.metadata?.customerId,\n    name: body.name || body.metadata?.name || \"Customer\",\n    email: body.email || body.metadata?.email || \"\",\n    phone: body.phone || \"\",\n    company: body.company || body.metadata?.company || \"\",\n    title: body.title || body.metadata?.title || \"\",\n    vapiCallId: body.vapiCallId || body.vapi_call_id || body.callId || body.id || \"\",\n    callStatus: body.call_status || body.callStatus || body.status || \"completed\",\n    transcript,\n    rawSummary: body.summary || \"\",\n    duration: Number(body.duration || body.durationSeconds || 0),\n    recordingUrl: body.recording_url || body.recordingUrl || body.stereoRecordingUrl || \"\"\n  }\n}];"
+      },
+      "id": "w1-normalize",
+      "name": "Normalize Call Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 260]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this phone call and return JSON only. No markdown.\n\nRequired shape:\n{\n  \"interest_level\": \"high | medium | low | unknown\",\n  \"sentiment\": \"positive | neutral | negative\",\n  \"meeting_recommended\": true,\n  \"summary\": \"1-2 sentence call summary\",\n  \"next_action\": \"recommended next action\",\n  \"lead_score\": 0,\n  \"customer_status\": \"interested | not_interested | no_answer | contacted\"\n}\n\nCustomer:\nName: {{ $json.name }}\nCompany: {{ $json.company }}\nTitle: {{ $json.title }}\n\nTranscript:\n{{ $json.transcript || \"No transcript returned.\" }}",
+        "options": {
+          "systemMessage": "You analyze sales qualification calls and return strict JSON only."
+        }
+      },
+      "id": "w1-ai",
+      "name": "AI Call Analysis",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [500, 260]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "w1-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [500, 500]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const raw = $json.output || \"{}\";\nlet parsed;\ntry {\n  parsed = typeof raw === \"string\" ? JSON.parse(raw.replace(/```json|```/g, \"\").trim()) : raw;\n} catch (error) {\n  parsed = {};\n}\nconst source = $(\"Normalize Call Payload\").item.json;\nreturn {\n  json: {\n    ...source,\n    interest_level: parsed.interest_level || \"unknown\",\n    sentiment: parsed.sentiment || \"neutral\",\n    meeting_recommended: Boolean(parsed.meeting_recommended),\n    summary: parsed.summary || source.rawSummary || \"Call completed.\",\n    next_action: parsed.next_action || \"Review call result.\",\n    lead_score: Number(parsed.lead_score || 35),\n    customer_status: parsed.customer_status || (parsed.meeting_recommended ? \"interested\" : \"contacted\")\n  }\n};"
+      },
+      "id": "w1-parse",
+      "name": "Parse AI Call Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 260]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://voiceagent-gamma-lovat.vercel.app/api/calls/webhook-result",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customerId", "value": "={{ $json.customerId }}" },
+            { "name": "vapiCallId", "value": "={{ $json.vapiCallId }}" },
+            { "name": "call_status", "value": "={{ $json.callStatus }}" },
+            { "name": "transcript", "value": "={{ $json.transcript }}" },
+            { "name": "summary", "value": "={{ $json.summary }}" },
+            { "name": "sentiment", "value": "={{ $json.sentiment }}" },
+            { "name": "interest_level", "value": "={{ $json.interest_level }}" },
+            { "name": "meeting_recommended", "value": "={{ $json.meeting_recommended }}" },
+            { "name": "next_action", "value": "={{ $json.next_action }}" },
+            { "name": "lead_score", "value": "={{ $json.lead_score }}" },
+            { "name": "duration", "value": "={{ $json.duration }}" },
+            { "name": "recording_url", "value": "={{ $json.recordingUrl }}" },
+            { "name": "customer_status", "value": "={{ $json.customer_status }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w1-save",
+      "name": "Save Conversation to CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1040, 260]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "REPLACE_WITH_W3_MEETING_WEBHOOK_URL",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customerId", "value": "={{ $('Parse AI Call Analysis').item.json.customerId }}" },
+            { "name": "callId", "value": "={{ $json.call.id }}" },
+            { "name": "name", "value": "={{ $('Parse AI Call Analysis').item.json.name }}" },
+            { "name": "company", "value": "={{ $('Parse AI Call Analysis').item.json.company }}" },
+            { "name": "transcript", "value": "={{ $('Parse AI Call Analysis').item.json.transcript }}" },
+            { "name": "summary", "value": "={{ $('Parse AI Call Analysis').item.json.summary }}" },
+            { "name": "meeting_recommended", "value": "={{ $('Parse AI Call Analysis').item.json.meeting_recommended }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w1-trigger-w3",
+      "name": "Trigger W3 Meeting Extraction",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1280, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "REPLACE_WITH_W4_INTELLIGENCE_WEBHOOK_URL",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customerId", "value": "={{ $('Parse AI Call Analysis').item.json.customerId }}" },
+            { "name": "callId", "value": "={{ $json.call.id }}" },
+            { "name": "name", "value": "={{ $('Parse AI Call Analysis').item.json.name }}" },
+            { "name": "company", "value": "={{ $('Parse AI Call Analysis').item.json.company }}" },
+            { "name": "title", "value": "={{ $('Parse AI Call Analysis').item.json.title }}" },
+            { "name": "transcript", "value": "={{ $('Parse AI Call Analysis').item.json.transcript }}" },
+            { "name": "summary", "value": "={{ $('Parse AI Call Analysis').item.json.summary }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w1-trigger-w4",
+      "name": "Trigger W4 Customer Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1280, 360]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": true,\n  \"workflow\": \"W1 Conversation Recorder\",\n  \"customerId\": \"{{ $('Parse AI Call Analysis').item.json.customerId }}\"\n}",
+        "options": {}
+      },
+      "id": "w1-response",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1520, 260]
+    }
+  ],
+  "connections": {
+    "W1 Conversation Webhook": { "main": [[{ "node": "Normalize Call Payload", "type": "main", "index": 0 }]] },
+    "Normalize Call Payload": { "main": [[{ "node": "AI Call Analysis", "type": "main", "index": 0 }]] },
+    "OpenAI Chat Model": { "ai_languageModel": [[{ "node": "AI Call Analysis", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Call Analysis": { "main": [[{ "node": "Parse AI Call Analysis", "type": "main", "index": 0 }]] },
+    "Parse AI Call Analysis": { "main": [[{ "node": "Save Conversation to CRM", "type": "main", "index": 0 }]] },
+    "Save Conversation to CRM": { "main": [[{ "node": "Trigger W3 Meeting Extraction", "type": "main", "index": 0 }]] },
+    "Trigger W3 Meeting Extraction": { "main": [[{ "node": "Trigger W4 Customer Intelligence", "type": "main", "index": 0 }]] },
+    "Trigger W4 Customer Intelligence": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}

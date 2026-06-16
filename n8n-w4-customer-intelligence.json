@@ -1,0 +1,154 @@
+{
+  "name": "W4 - Customer Intelligence",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "w4-customer-intelligence",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "w4-webhook",
+      "name": "W4 Intelligence Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst company = body.company || body.business_name || \"\";\nconst title = body.title || body.role || \"\";\nreturn [{\n  json: {\n    customerId: body.customerId || body.customer_id,\n    callId: body.callId || body.call_id || \"\",\n    name: body.name || \"Customer\",\n    company,\n    title,\n    transcript: body.transcript || \"\",\n    callSummary: body.summary || \"\",\n    search_query: [company, title].filter(Boolean).join(\" \") + \" company role background\"\n  }\n}];"
+      },
+      "id": "w4-normalize",
+      "name": "Normalize Intelligence Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 260]
+    },
+    {
+      "parameters": {
+        "url": "https://serpapi.com/search.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "q", "value": "={{ $json.search_query }}" },
+            { "name": "api_key", "value": "REPLACE_WITH_SERPAPI_API_KEY" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w4-serpapi",
+      "name": "SerpAPI Company Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [500, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $(\"Normalize Intelligence Context\").item.json;\nconst results = $json.organic_results || [];\nconst snippets = results.slice(0, 5).map(item => `${item.title || \"\"}: ${item.snippet || \"\"} (${item.link || \"\"})`).join(\"\\n\");\nconst website = (results.find(item => String(item.link || \"\").startsWith(\"http\")) || {}).link || \"\";\nreturn [{ json: { ...source, website, snippets } }];"
+      },
+      "id": "w4-parse-search",
+      "name": "Parse Search Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 260]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a CRM intelligence profile from call context and search snippets. Return JSON only.\n\nRequired shape:\n{\n  \"background_summary\": \"customer profile summary\",\n  \"company_summary\": \"company description\",\n  \"role_summary\": \"what this person's title/role likely means\",\n  \"pain_points\": \"pain points from call\",\n  \"needs\": \"customer needs from call\",\n  \"budget\": \"budget signal or unknown\",\n  \"decision_authority\": \"decision maker / influencer / unknown\",\n  \"source_notes\": \"sources and caveats\"\n}\n\nCustomer: {{ $json.name }}\nCompany: {{ $json.company }}\nTitle: {{ $json.title }}\nCall summary: {{ $json.callSummary }}\nTranscript:\n{{ $json.transcript }}\n\nSearch snippets:\n{{ $json.snippets }}",
+        "options": {
+          "systemMessage": "You enrich CRM profiles using only the provided call and search context. Return strict JSON only."
+        }
+      },
+      "id": "w4-ai",
+      "name": "AI Intelligence Summary",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [1020, 260]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "w4-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [1020, 500]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const raw = $json.output || \"{}\";\nlet parsed;\ntry { parsed = JSON.parse(String(raw).replace(/```json|```/g, \"\").trim()); } catch (error) { parsed = {}; }\nconst source = $(\"Parse Search Context\").item.json;\nreturn {\n  json: {\n    ...source,\n    background_summary: parsed.background_summary || source.callSummary || \"\",\n    company_summary: parsed.company_summary || \"\",\n    role_summary: parsed.role_summary || \"\",\n    pain_points: parsed.pain_points || \"\",\n    needs: parsed.needs || \"\",\n    budget: parsed.budget || \"Unknown\",\n    decision_authority: parsed.decision_authority || \"Unknown\",\n    source_notes: parsed.source_notes || source.snippets || \"\"\n  }\n};"
+      },
+      "id": "w4-parse-ai",
+      "name": "Parse Intelligence JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 260]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://voiceagent-gamma-lovat.vercel.app/api/customers/{{ $json.customerId }}/intelligence",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "callId", "value": "={{ $json.callId }}" },
+            { "name": "business_name", "value": "={{ $json.company }}" },
+            { "name": "title", "value": "={{ $json.title }}" },
+            { "name": "website", "value": "={{ $json.website }}" },
+            { "name": "background_summary", "value": "={{ $json.background_summary }}" },
+            { "name": "company_summary", "value": "={{ $json.company_summary }}" },
+            { "name": "role_summary", "value": "={{ $json.role_summary }}" },
+            { "name": "pain_points", "value": "={{ $json.pain_points }}" },
+            { "name": "needs", "value": "={{ $json.needs }}" },
+            { "name": "budget", "value": "={{ $json.budget }}" },
+            { "name": "decision_authority", "value": "={{ $json.decision_authority }}" },
+            { "name": "source_notes", "value": "={{ $json.source_notes }}" },
+            { "name": "intelligence_status", "value": "completed" },
+            { "name": "createResearchRecord", "value": "={{ true }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w4-save",
+      "name": "Save Customer Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1560, 260]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": true,\n  \"workflow\": \"W4 Customer Intelligence\",\n  \"customerId\": \"{{ $('Parse Intelligence JSON').item.json.customerId }}\"\n}",
+        "options": {}
+      },
+      "id": "w4-response",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1800, 260]
+    }
+  ],
+  "connections": {
+    "W4 Intelligence Webhook": { "main": [[{ "node": "Normalize Intelligence Context", "type": "main", "index": 0 }]] },
+    "Normalize Intelligence Context": { "main": [[{ "node": "SerpAPI Company Search", "type": "main", "index": 0 }]] },
+    "SerpAPI Company Search": { "main": [[{ "node": "Parse Search Context", "type": "main", "index": 0 }]] },
+    "Parse Search Context": { "main": [[{ "node": "AI Intelligence Summary", "type": "main", "index": 0 }]] },
+    "OpenAI Chat Model": { "ai_languageModel": [[{ "node": "AI Intelligence Summary", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Intelligence Summary": { "main": [[{ "node": "Parse Intelligence JSON", "type": "main", "index": 0 }]] },
+    "Parse Intelligence JSON": { "main": [[{ "node": "Save Customer Intelligence", "type": "main", "index": 0 }]] },
+    "Save Customer Intelligence": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}

@@ -1,0 +1,156 @@
+{
+  "name": "W3 - Meeting From Call",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "w3-meeting-from-call",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "w3-webhook",
+      "name": "W3 Meeting Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nreturn [{\n  json: {\n    customerId: body.customerId || body.customer_id,\n    callId: body.callId || body.call_id || \"\",\n    name: body.name || \"Customer\",\n    company: body.company || \"\",\n    transcript: body.transcript || \"\",\n    summary: body.summary || \"\",\n    meeting_recommended: String(body.meeting_recommended || body.meetingRecommended || \"\").toLowerCase() === \"true\"\n  }\n}];"
+      },
+      "id": "w3-normalize",
+      "name": "Normalize Call Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 260]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Read this call transcript and decide whether to create a meeting. Return JSON only.\n\nRequired shape:\n{\n  \"create_meeting\": true,\n  \"meeting_title\": \"short title\",\n  \"meeting_time_iso\": \"ISO datetime if mentioned, otherwise empty string\",\n  \"duration_minutes\": 30,\n  \"meeting_reason\": \"why the meeting should happen\",\n  \"customer_intent\": \"what the customer wants\",\n  \"meeting_notes\": \"CRM notes\",\n  \"follow_up_action\": \"what the team should prepare\"\n}\n\nCustomer: {{ $json.name }}\nCompany: {{ $json.company }}\nCall Summary: {{ $json.summary }}\nTranscript:\n{{ $json.transcript }}",
+        "options": {
+          "systemMessage": "You extract meeting intent from sales calls and return strict JSON only."
+        }
+      },
+      "id": "w3-ai",
+      "name": "AI Meeting Extractor",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [500, 260]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "w3-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [500, 500]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const raw = $json.output || \"{}\";\nlet parsed;\ntry { parsed = JSON.parse(String(raw).replace(/```json|```/g, \"\").trim()); } catch (error) { parsed = {}; }\nconst source = $(\"Normalize Call Context\").item.json;\nconst start = parsed.meeting_time_iso ? new Date(parsed.meeting_time_iso) : new Date(Date.now() + 24 * 60 * 60 * 1000);\nreturn {\n  json: {\n    ...source,\n    create_meeting: Boolean(parsed.create_meeting || source.meeting_recommended),\n    meeting_title: parsed.meeting_title || `${source.name} consultation`,\n    meeting_time: start.toISOString(),\n    meeting_reason: parsed.meeting_reason || \"Meeting requested or recommended after call.\",\n    customer_intent: parsed.customer_intent || \"Discuss next steps.\",\n    meeting_notes: parsed.meeting_notes || source.summary || \"Meeting created from call transcript.\",\n    follow_up_action: parsed.follow_up_action || \"Prepare call summary before meeting.\"\n  }\n};"
+      },
+      "id": "w3-parse",
+      "name": "Parse Meeting Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 260]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.create_meeting }}", "value2": true }
+          ]
+        }
+      },
+      "id": "w3-if",
+      "name": "If Meeting Needed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1040, 260]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://voiceagent-gamma-lovat.vercel.app/api/meetings",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customerId", "value": "={{ $json.customerId }}" },
+            { "name": "callId", "value": "={{ $json.callId }}" },
+            { "name": "meeting_title", "value": "={{ $json.meeting_title }}" },
+            { "name": "meeting_time", "value": "={{ $json.meeting_time }}" },
+            { "name": "meeting_status", "value": "booked" },
+            { "name": "meeting_notes", "value": "={{ $json.meeting_notes }}" },
+            { "name": "meeting_reason", "value": "={{ $json.meeting_reason }}" },
+            { "name": "customer_intent", "value": "={{ $json.customer_intent }}" },
+            { "name": "follow_up_action", "value": "={{ $json.follow_up_action }}" },
+            { "name": "confirmation_status", "value": "pending" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w3-create",
+      "name": "Create CRM Meeting",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1280, 180]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://voiceagent-gamma-lovat.vercel.app/api/customers/{{ $('Parse Meeting Details').item.json.customerId }}",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "status", "value": "meeting_booked" },
+            { "name": "notes", "value": "W3 created meeting from call transcript." }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w3-update-customer",
+      "name": "Update Customer Meeting Booked",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1520, 180]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": true,\n  \"workflow\": \"W3 Meeting From Call\"\n}",
+        "options": {}
+      },
+      "id": "w3-response",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1760, 260]
+    }
+  ],
+  "connections": {
+    "W3 Meeting Webhook": { "main": [[{ "node": "Normalize Call Context", "type": "main", "index": 0 }]] },
+    "Normalize Call Context": { "main": [[{ "node": "AI Meeting Extractor", "type": "main", "index": 0 }]] },
+    "OpenAI Chat Model": { "ai_languageModel": [[{ "node": "AI Meeting Extractor", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Meeting Extractor": { "main": [[{ "node": "Parse Meeting Details", "type": "main", "index": 0 }]] },
+    "Parse Meeting Details": { "main": [[{ "node": "If Meeting Needed", "type": "main", "index": 0 }]] },
+    "If Meeting Needed": { "main": [[{ "node": "Create CRM Meeting", "type": "main", "index": 0 }], [{ "node": "Respond", "type": "main", "index": 0 }]] },
+    "Create CRM Meeting": { "main": [[{ "node": "Update Customer Meeting Booked", "type": "main", "index": 0 }]] },
+    "Update Customer Meeting Booked": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}
