@@ -2,28 +2,28 @@ import { createActivity, createCall, getCustomer, updateCustomer } from "@/lib/r
 
 export const workflowTemplates = [
   {
-    name: "Lead Collection",
+    name: "W1 Conversation Recorder",
     source: "My workflow 4.json",
-    description: "Scrapes company websites from Google Sheets rows and creates CRM-ready leads.",
-    status: "Ready to connect"
+    description: "Receives completed call payloads and records transcript, summary, sentiment, recording, score, and next action in CRM.",
+    status: "CRM webhook"
   },
   {
-    name: "Voice Calling",
+    name: "W2 Interest Calling",
     source: "My workflow 3.json",
-    description: "Sends leads into Vapi, captures transcript data, and prepares AI call analysis.",
+    description: "Triggered from CRM customer records, sends the lead into Vapi, and asks whether the customer is interested.",
     status: "Vapi configured"
   },
   {
-    name: "Meeting Booking",
+    name: "W3 Meeting Extractor",
     source: "My workflow 2.json",
-    description: "Reads meeting emails, creates calendar events, and sends confirmations.",
-    status: "Needs calendar auth"
+    description: "Reads call transcript and creates structured CRM meetings when the customer asks to book or follow up.",
+    status: "CRM meeting API"
   },
   {
-    name: "Email Outreach",
+    name: "W4 Customer Intelligence",
     source: "My workflow (2).json",
-    description: "Generates friendly outreach emails and sends them through Gmail.",
-    status: "Imported"
+    description: "Uses call context plus company/contact research to enrich the customer profile with background, role, needs, and pain points.",
+    status: "Research API"
   }
 ];
 
@@ -42,6 +42,7 @@ export async function triggerN8nWorkflow(customerId: string, workflow = "voice-c
     phone: customer.phone,
     email: customer.email,
     company: customer.company,
+    title: customer.title,
     workflow
   };
 
@@ -64,7 +65,7 @@ export async function triggerN8nWorkflow(customerId: string, workflow = "voice-c
     next_action: "Wait for call result webhook."
   });
 
-  await updateCustomer(customer.id, { status: "contacted" });
+  await updateCustomer(customer.id, { status: "calling" });
   await createActivity(customer.id, "workflow_triggered", `${workflow} workflow started for ${customer.name}.`);
 
   return { ok: true, demoMode: !webhookUrl, payload };

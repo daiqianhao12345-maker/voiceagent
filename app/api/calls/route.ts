@@ -16,9 +16,13 @@ export async function POST(request: Request) {
   const call = await createCall({
     ...body,
     customer_id: body.customer_id || body.customerId,
+    vapi_call_id: body.vapi_call_id || body.vapiCallId || body.callId || null,
     call_status: body.call_status || body.status || "pending",
     ai_summary: body.ai_summary || body.summary || null,
+    interest_level: body.interest_level || body.interestLevel || body.interest || null,
+    meeting_recommended: body.meeting_recommended ?? body.meetingRecommended ?? null,
     next_action: body.next_action || body.nextAction || null,
+    lead_score: body.lead_score || body.leadScore || null,
     recording_url: body.recording_url || body.recordingUrl || null
   });
 

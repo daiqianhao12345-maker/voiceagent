@@ -36,12 +36,17 @@ export default async function MeetingsPage() {
                 </p>
               </div>
             ) : meetings.map((meeting) => (
-              <article key={meeting.id} className="grid gap-3 p-4 md:grid-cols-[200px_1fr_130px]">
+              <article key={meeting.id} className="grid gap-3 p-4 md:grid-cols-[220px_1fr_150px]">
                 <div>
                   <p className="font-semibold">{meeting.customer_name || "Customer"}</p>
+                  <p className="mt-1 text-sm font-medium text-ink/80">{meeting.meeting_title || "Untitled meeting"}</p>
                   <p className="mt-1 text-sm text-ink/60">{dateTime(meeting.meeting_time)}</p>
                 </div>
-                <p className="text-sm leading-6 text-ink/65">{meeting.meeting_notes || "No meeting notes yet."}</p>
+                <div className="text-sm leading-6 text-ink/65">
+                  <p>{meeting.meeting_notes || meeting.meeting_reason || "No meeting notes yet."}</p>
+                  <p className="mt-2 text-xs text-ink/55">{meeting.customer_intent || meeting.follow_up_action || "No intent extracted yet."}</p>
+                  {meeting.calendar_event_url ? <a className="mt-2 inline-block font-semibold text-brand" href={meeting.calendar_event_url}>Calendar event</a> : null}
+                </div>
                 <div className="md:text-right"><StatusBadge value={meeting.meeting_status} /></div>
               </article>
             ))}

@@ -36,20 +36,28 @@ export default async function CallsPage() {
                 </p>
               </div>
             ) : calls.map((call) => (
-              <article key={call.id} className="grid gap-3 p-4 md:grid-cols-[170px_1fr_140px]">
+              <article key={call.id} className="grid gap-4 p-4 md:grid-cols-[180px_1fr_180px]">
                 <div>
                   <p className="font-semibold">{call.customer_name || "Customer"}</p>
                   <p className="mt-1 text-xs text-ink/50">{shortDate(call.created_at)}</p>
+                  {call.vapi_call_id ? <p className="mt-2 break-all text-xs text-ink/45">Vapi: {call.vapi_call_id}</p> : null}
                 </div>
                 <div>
                   <p className="text-sm font-semibold">{call.ai_summary || "Waiting for AI summary"}</p>
-                  <p className="mt-2 text-sm leading-6 text-ink/65">{call.transcript || call.next_action || "Transcript will appear after the voice agent webhook posts back to /api/calls/webhook-result."}</p>
-                  {call.recording_url ? <a className="mt-2 inline-block text-sm font-semibold text-brand" href={call.recording_url}>Recording</a> : null}
+                  <p className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap rounded-md bg-field p-3 text-sm leading-6 text-ink/65">
+                    {call.transcript || call.next_action || "Transcript will appear after W1 posts back to /api/calls/webhook-result."}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                    <span className="rounded-full bg-field px-3 py-1">Interest: {call.interest_level || "unknown"}</span>
+                    <span className="rounded-full bg-field px-3 py-1">Meeting: {call.meeting_recommended ? "yes" : "no"}</span>
+                    <span className="rounded-full bg-field px-3 py-1">Lead score: {call.lead_score ?? "n/a"}</span>
+                  </div>
                 </div>
                 <div className="flex items-start justify-between gap-2 md:block md:text-right">
                   <StatusBadge value={call.call_status} />
                   <p className="mt-2 text-xs font-semibold uppercase tracking-[0.1em] text-ink/50">{call.sentiment || "No sentiment"}</p>
                   <p className="mt-2 text-sm text-ink/60">{call.duration ? `${Math.round(call.duration / 60)} min` : "No duration"}</p>
+                  {call.recording_url ? <a className="mt-2 inline-block text-sm font-semibold text-brand" href={call.recording_url}>Recording</a> : null}
                 </div>
               </article>
             ))}

@@ -6,8 +6,11 @@ import type { Customer } from "@/types/crm";
 
 export function MeetingForm({ customers }: { customers: Customer[] }) {
   const [customerId, setCustomerId] = useState(customers[0]?.id || "");
+  const [meetingTitle, setMeetingTitle] = useState("");
   const [meetingTime, setMeetingTime] = useState("");
   const [meetingNotes, setMeetingNotes] = useState("");
+  const [meetingReason, setMeetingReason] = useState("");
+  const [followUpAction, setFollowUpAction] = useState("");
   const [message, setMessage] = useState("");
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -21,15 +24,22 @@ export function MeetingForm({ customers }: { customers: Customer[] }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         customer_id: customerId,
+        meeting_title: meetingTitle || "Consultation",
         meeting_time: meetingTime ? new Date(meetingTime).toISOString() : null,
         meeting_status: "booked",
-        meeting_notes: meetingNotes
+        meeting_notes: meetingNotes,
+        meeting_reason: meetingReason,
+        follow_up_action: followUpAction,
+        confirmation_status: "pending"
       })
     });
 
     if (response.ok) {
       setMessage("Meeting booked. Refresh to see it in the schedule.");
+      setMeetingTitle("");
       setMeetingNotes("");
+      setMeetingReason("");
+      setFollowUpAction("");
       setMeetingTime("");
     }
   }
@@ -55,8 +65,20 @@ export function MeetingForm({ customers }: { customers: Customer[] }) {
           <input className="focus-ring mt-1 h-10 w-full rounded-md border border-line bg-field px-3 text-sm" type="datetime-local" value={meetingTime} onChange={(event) => setMeetingTime(event.target.value)} />
         </label>
         <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-ink/55">Title</span>
+          <input className="focus-ring mt-1 h-10 w-full rounded-md border border-line bg-field px-3 text-sm" value={meetingTitle} onChange={(event) => setMeetingTitle(event.target.value)} />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-ink/55">Reason</span>
+          <input className="focus-ring mt-1 h-10 w-full rounded-md border border-line bg-field px-3 text-sm" value={meetingReason} onChange={(event) => setMeetingReason(event.target.value)} />
+        </label>
+        <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.1em] text-ink/55">Notes</span>
           <textarea className="focus-ring mt-1 min-h-24 w-full rounded-md border border-line bg-field px-3 py-2 text-sm" value={meetingNotes} onChange={(event) => setMeetingNotes(event.target.value)} />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-ink/55">Follow-up Action</span>
+          <textarea className="focus-ring mt-1 min-h-20 w-full rounded-md border border-line bg-field px-3 py-2 text-sm" value={followUpAction} onChange={(event) => setFollowUpAction(event.target.value)} />
         </label>
       </div>
       <button className="focus-ring mt-4 h-11 w-full rounded-md bg-brand px-4 text-sm font-bold text-white hover:bg-brand/90 disabled:cursor-not-allowed disabled:bg-ink/25" disabled={customers.length === 0}>Book Meeting</button>

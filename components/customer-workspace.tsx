@@ -12,6 +12,7 @@ const blank = {
   email: "",
   phone: "",
   company: "",
+  title: "",
   source: "Manual",
   status: "new",
   notes: "",
@@ -72,7 +73,7 @@ export function CustomerWorkspace({ initialCustomers }: { initialCustomers: Cust
       body: JSON.stringify({ customerId: id })
     });
     setCustomers((current) =>
-      current.map((customer) => (customer.id === id ? { ...customer, status: "contacted" } : customer))
+      current.map((customer) => (customer.id === id ? { ...customer, status: "calling" } : customer))
     );
     setBusyId(null);
   }
@@ -217,6 +218,7 @@ export function CustomerWorkspace({ initialCustomers }: { initialCustomers: Cust
             ["email", "Email"],
             ["phone", "Phone"],
             ["company", "Company"],
+            ["title", "Title / Role"],
             ["source", "Lead Source"]
           ].map(([key, label]) => (
             <label key={key} className="block">
@@ -236,7 +238,7 @@ export function CustomerWorkspace({ initialCustomers }: { initialCustomers: Cust
               value={String(form.status || "new")}
               onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as Customer["status"] }))}
             >
-              {["new", "contacted", "interested", "meeting_booked", "closed", "lost"].map((status) => (
+              {["new", "contacted", "calling", "interested", "not_interested", "no_answer", "meeting_booked", "closed", "lost"].map((status) => (
                 <option key={status} value={status}>{status.replaceAll("_", " ")}</option>
               ))}
             </select>

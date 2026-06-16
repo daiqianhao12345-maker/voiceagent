@@ -7,11 +7,15 @@ import type { ScrapedData } from "@/types/crm";
 
 const blank = {
   business_name: "",
+  contact_name: "",
+  title: "",
   phone: "",
   email: "",
   website: "",
   source_url: "",
   summary: "",
+  role_summary: "",
+  source_notes: "",
   status: "new"
 };
 
@@ -77,7 +81,7 @@ export function ResearchWorkspace({ initialRows }: { initialRows: ScrapedData[] 
           <table className="w-full min-w-[920px] text-left text-sm">
             <thead className="border-b border-line bg-field text-xs uppercase tracking-[0.1em] text-ink/55">
               <tr>
-                <th className="px-4 py-3">Company</th>
+                <th className="px-4 py-3">Company / Contact</th>
                 <th className="px-4 py-3">scrapedDataId</th>
                 <th className="px-4 py-3">Website</th>
                 <th className="px-4 py-3">Status</th>
@@ -96,7 +100,9 @@ export function ResearchWorkspace({ initialRows }: { initialRows: ScrapedData[] 
                 <tr key={row.id} className="bg-white align-top">
                   <td className="px-4 py-3">
                     <p className="font-semibold text-ink">{row.business_name || "Unnamed company"}</p>
+                    <p className="mt-1 text-xs text-ink/55">{row.contact_name || "No contact"}{row.title ? ` · ${row.title}` : ""}</p>
                     <p className="mt-1 max-w-sm text-xs leading-5 text-ink/55">{row.summary || "No summary yet"}</p>
+                    {row.role_summary ? <p className="mt-1 max-w-sm text-xs leading-5 text-ink/55">{row.role_summary}</p> : null}
                   </td>
                   <td className="px-4 py-3">
                     <code className="rounded bg-field px-2 py-1 text-xs text-ink/70">{row.id}</code>
@@ -141,6 +147,8 @@ export function ResearchWorkspace({ initialRows }: { initialRows: ScrapedData[] 
         <div className="space-y-3">
           {[
             ["business_name", "Business Name"],
+            ["contact_name", "Contact Name"],
+            ["title", "Title / Role"],
             ["phone", "Phone"],
             ["email", "Email"],
             ["website", "Website"],
@@ -174,6 +182,22 @@ export function ResearchWorkspace({ initialRows }: { initialRows: ScrapedData[] 
               className="focus-ring mt-1 min-h-24 w-full rounded-md border border-line bg-field px-3 py-2 text-sm"
               value={String(form.summary ?? "")}
               onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))}
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.1em] text-ink/55">Role Summary</span>
+            <textarea
+              className="focus-ring mt-1 min-h-20 w-full rounded-md border border-line bg-field px-3 py-2 text-sm"
+              value={String(form.role_summary ?? "")}
+              onChange={(event) => setForm((current) => ({ ...current, role_summary: event.target.value }))}
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.1em] text-ink/55">Source Notes</span>
+            <textarea
+              className="focus-ring mt-1 min-h-20 w-full rounded-md border border-line bg-field px-3 py-2 text-sm"
+              value={String(form.source_notes ?? "")}
+              onChange={(event) => setForm((current) => ({ ...current, source_notes: event.target.value }))}
             />
           </label>
         </div>
