@@ -65,8 +65,12 @@ export async function triggerN8nWorkflow(customerId: string, workflow = "voice-c
     next_action: "Wait for call result webhook."
   });
 
-  await updateCustomer(customer.id, { status: "calling" });
-  await createActivity(customer.id, "workflow_triggered", `${workflow} workflow started for ${customer.name}.`);
+  if (webhookUrl) {
+    await updateCustomer(customer.id, { status: "calling" });
+    await createActivity(customer.id, "workflow_triggered", `${workflow} workflow started for ${customer.name}.`);
+  } else {
+    await createActivity(customer.id, "workflow_missing", `${workflow} webhook is not configured for ${customer.name}.`);
+  }
 
   return { ok: true, demoMode: !webhookUrl, payload };
 }

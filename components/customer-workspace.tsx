@@ -26,6 +26,7 @@ export function CustomerWorkspace({ initialCustomers }: { initialCustomers: Cust
   const [form, setForm] = useState<Partial<Customer>>(blank as Partial<Customer>);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [callNotice, setCallNotice] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const needle = query.toLowerCase();
@@ -67,14 +68,26 @@ export function CustomerWorkspace({ initialCustomers }: { initialCustomers: Cust
 
   async function startCall(id: string) {
     setBusyId(id);
-    await fetch("/api/calls/start", {
+    setCallNotice(null);
+    const response = await fetch("/api/calls/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ customerId: id })
     });
-    setCustomers((current) =>
-      current.map((customer) => (customer.id === id ? { ...customer, status: "calling" } : customer))
-    );
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setCallNotice(data.error || "Call workflow could not be started.");
+    } else if (data.demoMode) {
+      setCallNotice("n8n calling webhook is not configured in Vercel. Add N8N_LEAD_CALLING_WEBHOOK_URL and redeploy.");
+    } else {
+      setCustomers((current) =>
+        current.map((customer) => (customer.id === id ? { ...customer, status: "calling" } : customer))
+      );
+      setCallNotice("Call workflow started in n8n.");
+    }
+
     setBusyId(null);
   }
 
@@ -145,6 +158,12 @@ export function CustomerWorkspace({ initialCustomers }: { initialCustomers: Cust
             </button>
           </div>
         </div>
+
+        {callNotice ? (
+          <div className="border-b border-line bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+            {callNotice}
+          </div>
+        ) : null}
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[740px] text-left text-sm">

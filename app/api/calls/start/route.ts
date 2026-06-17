@@ -7,6 +7,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "customerId is required" }, { status: 400 });
   }
 
-  const result = await triggerN8nWorkflow(body.customerId, body.workflow || "voice-calling");
-  return NextResponse.json(result);
+  try {
+    const result = await triggerN8nWorkflow(body.customerId, body.workflow || "voice-calling");
+    return NextResponse.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to start call";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
