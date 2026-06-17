@@ -1,4 +1,4 @@
-import { createActivity, createCall, getCustomer, updateCustomer } from "@/lib/repository";
+import { createActivity, getCustomer, updateCustomer } from "@/lib/repository";
 
 export const workflowTemplates = [
   {
@@ -57,13 +57,6 @@ export async function triggerN8nWorkflow(customerId: string, workflow = "voice-c
       throw new Error(`n8n returned ${response.status}`);
     }
   }
-
-  await createCall({
-    customer_id: customer.id,
-    call_status: webhookUrl ? "calling" : "pending",
-    ai_summary: webhookUrl ? "n8n workflow triggered." : "Demo mode: add N8N_LEAD_CALLING_WEBHOOK_URL to trigger calls.",
-    next_action: "Wait for call result webhook."
-  });
 
   if (webhookUrl) {
     await updateCustomer(customer.id, { status: "calling" });
