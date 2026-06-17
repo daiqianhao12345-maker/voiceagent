@@ -1,5 +1,22 @@
 import { createActivity, getCustomer, updateCustomer } from "@/lib/repository";
 
+const DEFAULT_LEAD_CALLING_WEBHOOK_URL = "https://daiqianhao30.app.n8n.cloud/webhook/crm-start-interest-call";
+
+function resolveWebhookUrl(workflow: string) {
+  const configuredUrl =
+    workflow === "voice-calling"
+      ? process.env.N8N_LEAD_CALLING_WEBHOOK_URL
+      : process.env.N8N_WORKFLOW_WEBHOOK_URL;
+
+  const fallbackUrl = workflow === "voice-calling" ? DEFAULT_LEAD_CALLING_WEBHOOK_URL : "";
+  const rawUrl = (configuredUrl || fallbackUrl).trim();
+  if (!rawUrl) return "";
+
+  return rawUrl
+    .replace("https://daidarren12345.app.n8n.cloud", "https://daiqianhao30.app.n8n.cloud")
+    .replace("/webhook-test/", "/webhook/");
+}
+
 export const workflowTemplates = [
   {
     name: "W1 Conversation Recorder",
@@ -31,10 +48,7 @@ export async function triggerN8nWorkflow(customerId: string, workflow = "voice-c
   const customer = await getCustomer(customerId);
   if (!customer) throw new Error("Customer not found");
 
-  const webhookUrl =
-    workflow === "voice-calling"
-      ? process.env.N8N_LEAD_CALLING_WEBHOOK_URL
-      : process.env.N8N_WORKFLOW_WEBHOOK_URL;
+  const webhookUrl = resolveWebhookUrl(workflow);
 
   const payload = {
     customerId: customer.id,
@@ -54,7 +68,9 @@ export async function triggerN8nWorkflow(customerId: string, workflow = "voice-c
     });
 
     if (!response.ok) {
-      throw new Error(`n8n returned ${response.status}`);
+      const detail = await response.text().catch(() => "");
+      const shortDetail = detail ? `: ${detail.slice(0, 240)}` : "";
+      throw new Error(`n8n returned ${response.status}${shortDetail}`);
     }
   }
 
@@ -65,5 +81,15 @@ export async function triggerN8nWorkflow(customerId: string, workflow = "voice-c
     await createActivity(customer.id, "workflow_missing", `${workflow} webhook is not configured for ${customer.name}.`);
   }
 
-  return { ok: true, demoMode: !webhookUrl, payload };
+  return {
+    ok: true,
+    demoMode: !webhookUrl,
+    payload,
+    webhook: webhookUrl
+      ? {
+          host: new URL(webhookUrl).host,
+          path: new URL(webhookUrl).pathname
+        }
+      : null
+  };
 }

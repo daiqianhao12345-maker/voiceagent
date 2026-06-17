@@ -85,7 +85,8 @@ export function CustomerWorkspace({ initialCustomers }: { initialCustomers: Cust
       setCustomers((current) =>
         current.map((customer) => (customer.id === id ? { ...customer, status: "calling" } : customer))
       );
-      setCallNotice("Call workflow started in n8n.");
+      const webhookTarget = data.webhook ? `${data.webhook.host}${data.webhook.path}` : "n8n";
+      setCallNotice(`Call workflow started in ${webhookTarget}.`);
     }
 
     setBusyId(null);
